@@ -1,6 +1,6 @@
 name: flutter_root_jailbreak_checker
 description: A professional Flutter plugin to detect Root (Android) and Jailbreak (iOS) access. Essential for verifying device integrity in security-sensitive apps.
-version: 2.0.0
+version: 2.0.1
 
 repository: https://github.com/Rehmanalidevpro/flutter_root_jailbreak_checker
 issue_tracker: https://github.com/Rehmanalidevpro/flutter_root_jailbreak_checker/issues

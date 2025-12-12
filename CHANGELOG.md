@@ -1,3 +1,7 @@
+## 2.0.1
+- Updated documentation and README instructions.
+
+
 ## 2.0.0
 
 -   **Major Performance Update:** Optimized detection algorithms for faster and more accurate results.
