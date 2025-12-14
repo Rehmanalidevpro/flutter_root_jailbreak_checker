@@ -51,12 +51,12 @@ class MethodChannelFlutterRootJailbreakChecker
     String? requestHash,
   }) async {
     // Request the integrity token from the native layer
-    final String? token =
-        await methodChannel.invokeMethod<String>('requestPlayIntegrityToken', {
-      'cloudProjectNumber': cloudProjectNumber,
-      'nonce': nonce,
-      'requestHash': requestHash,
-    });
+    final String? token = await methodChannel
+        .invokeMethod<String>('requestPlayIntegrityToken', {
+          'cloudProjectNumber': cloudProjectNumber,
+          'nonce': nonce,
+          'requestHash': requestHash,
+        });
     return token;
   }
 }

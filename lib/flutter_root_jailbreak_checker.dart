@@ -36,10 +36,10 @@ class FlutterRootJailbreakChecker {
       // Step 2: Request Google Play Integrity Token (Android only)
       final token = await FlutterRootJailbreakCheckerPlatform.instance
           .requestPlayIntegrityToken(
-        cloudProjectNumber: config.cloudProjectNumber,
-        nonce: config.nonce,
-        requestHash: config.requestHash,
-      );
+            cloudProjectNumber: config.cloudProjectNumber,
+            nonce: config.nonce,
+            requestHash: config.requestHash,
+          );
 
       // Combine offline result with the new token
       return offlineResult.withPlayIntegrity(token: token);
@@ -82,9 +82,9 @@ class FlutterRootJailbreakChecker {
     }
     return FlutterRootJailbreakCheckerPlatform.instance
         .requestPlayIntegrityToken(
-      cloudProjectNumber: cloudProjectNumber,
-      nonce: nonce,
-      requestHash: requestHash,
-    );
+          cloudProjectNumber: cloudProjectNumber,
+          nonce: nonce,
+          requestHash: requestHash,
+        );
   }
 }

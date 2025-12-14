@@ -33,7 +33,7 @@ Add to your project's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_root_jailbreak_checker: ^2.0.0
+  flutter_root_jailbreak_checker: ^2.1.2
 ```
 
 Then run:
@@ -50,7 +50,7 @@ flutter pub get
 import 'package:flutter_root_jailbreak_checker/flutter_root_jailbreak_checker.dart';
 
 void performSecurityCheck() async {
-  final result = await FlutterRootJailbreakChecker().checkIntegrity();
+  final result = await FlutterRootJailbreakChecker().checkOfflineIntegrity();
 
   if (result.isSecure()) {
     print("Device is secure.");
@@ -58,6 +58,67 @@ void performSecurityCheck() async {
     print("Device is not secure.");
   }
 }
+```
+
+---
+
+## 🛡️ Google Play Integrity (Online Check - Android)
+
+This plugin supports Google Play Integrity API for banking-grade security. This checks if the app was installed from the Play Store and is not tampered with.
+
+**Prerequisites:**
+1. Enable **Play Integrity API** in Google Cloud Console.
+2. Get your **Cloud Project Number**.
+
+```dart
+import 'package:flutter_root_jailbreak_checker/flutter_root_jailbreak_checker.dart';
+
+void performOnlineCheck() async {
+  // Initialize the checker
+  final checker = FlutterRootJailbreakChecker();
+
+  // Prepare the API (Optional but recommended for speed)
+  // Replace '123456789' with your actual Google Cloud Project Number
+  await checker.preparePlayIntegrity("123456789");
+
+  // Configure the check
+  final config = IntegrityCheckConfig(
+    usePlayIntegrity: true,
+    cloudProjectNumber: "123456789", // REQUIRED for online check
+  );
+
+  // Run the check
+  final result = await checker.check(config);
+
+  if (result.wasPlayIntegritySuccessful) {
+    print("✅ Online Check Passed. Token: ${result.playIntegrityToken}");
+  } else {
+    print("❌ Online Check Failed: ${result.playIntegrityError}");
+  }
+}
+
+```
+
+---
+##  How to Enable Google Play Integrity (Online Check)
+
+To use the advanced online security check (Android), you need a **Google Cloud Project Number**.
+
+1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2.  Create a new project or select an existing one.
+3.  In the search bar, type **"Play Integrity API"** and select it.
+4.  Click **Enable** to activate the API for your project.
+5.  Go to the **Dashboard** (Home) of your project.
+6.  Look for the **Project Info** card. Copy the **Project Number** (e.g., `123456789012`).
+    *   *Note: Use the "Project Number", not the "Project ID".*
+7.  Pass this number to the `IntegrityCheckConfig` in your Flutter code.
+
+```dart
+final config = IntegrityCheckConfig(
+  usePlayIntegrity: true,
+  cloudProjectNumber: "YOUR_PROJECT_NUMBER_HERE",
+);
+
 ```
 
 ---
@@ -74,7 +135,7 @@ void performCustomSecurityCheck() async {
     blockIfRootedOrJailbroken: true,
   );
 
-  final result = await FlutterRootJailbreakChecker().checkIntegrity();
+  final result = await FlutterRootJailbreakChecker().checkOfflineIntegrity();
 
   if (result.isSecure(config)) {
     print("Device passes custom policy.");
@@ -87,6 +148,8 @@ void performCustomSecurityCheck() async {
 ```
 
 ---
+
+
 
 ## API Overview
 

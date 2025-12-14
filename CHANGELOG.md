@@ -1,3 +1,11 @@
+## 2.1.2
+
+-   **NEW:** Added support for **Google Play Integrity API** (Online Check).
+-   **Improved:** Updated example app to demonstrate both Offline and Online checks.
+-   **Fixed:** Enhanced detection logic for rooted devices.
+-   **Docs:** Updated README with instructions for finding Google Cloud Project Number.
+
+
 ## 2.0.1
 - Updated documentation and README instructions.
 
