@@ -11,8 +11,10 @@ A streamlined, offline-first Flutter plugin for detecting rooted Android devices
 * **Emulator and Simulator Detection:** Reliable identification for Android emulators and iOS simulators.
 * **Unsafe App Detection (Android):** Detects common root and hooking tools such as Magisk, SuperSU, and Xposed.
 * **Configurable Security Policies:** Enable or disable checks depending on your application requirements.
+* **Google Play Integrity (Online):** Verifies device integrity using Google's official online API for banking-grade security.
 * **Offline Operation:** All checks execute locally without network dependency.
 * **Simple API Surface:** Retrieve a complete integrity report or a single secure/unsafe verdict.
+
 
 ---
 
@@ -33,7 +35,7 @@ Add to your project's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_root_jailbreak_checker: ^2.1.2
+  flutter_root_jailbreak_checker: ^2.1.3
 ```
 
 Then run:

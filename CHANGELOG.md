@@ -1,3 +1,9 @@
+## 2.1.3
+
+*   **Updated:** Added package `topics` for better search ranking on pub.dev.
+*   **Docs:** Updated README to highlight Google Play Integrity (Online Check) support.
+
+
 ## 2.1.2
 
 -   **NEW:** Added support for **Google Play Integrity API** (Online Check).
