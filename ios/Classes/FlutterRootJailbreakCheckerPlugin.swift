@@ -4,6 +4,7 @@ import Flutter
 import UIKit
 
 public class SwiftFlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
+    
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter_root_jailbreak_checker", binaryMessenger: registrar.messenger())
         let instance = SwiftFlutterRootJailbreakCheckerPlugin()
@@ -11,19 +12,40 @@ public class SwiftFlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        if call.method == "checkIntegrity" {
+        // ERROR FIX 1: Method name must match Dart code ("checkOfflineIntegrity")
+        if call.method == "checkOfflineIntegrity" {
+            
+            let jailbroken = isJailbroken()
+            let realDevice = isRealDevice()
+            
+            // ERROR FIX 2: Return ALL keys expected by Dart Model (DeviceIntegrityResult)
             var results = [String: Any]()
-            results["isJailbroken"] = isJailbroken()
-            results["isRealDevice"] = isRealDevice()
-            results["isDeveloperModeEnabled"] = false
-
+            results["isJailbroken"] = jailbroken
+            results["isRealDevice"] = realDevice
+            results["isEmulator"] = !realDevice // Simulator = !Real
+            results["isRooted"] = false // iOS never has "Root" (it has Jailbreak)
+            results["hasPotentiallyDangerousApps"] = jailbroken // If jailbroken, apps are dangerous
+            results["isDeveloperModeEnabled"] = false // Difficult to detect on iOS safely
+            
             result(results)
+            
+        } else if call.method == "preparePlayIntegrity" || call.method == "requestPlayIntegrityToken" {
+            // ERROR FIX 3: Handle Online Check calls gracefully on iOS
+            // Return error code "UNAVAILABLE" so Dart knows it's not supported on iOS
+            result(FlutterError(code: "UNAVAILABLE", message: "Google Play Integrity is Android only.", details: nil))
+            
         } else {
             result(FlutterMethodNotImplemented)
         }
     }
 
+    // --- 🛡️ REAL JAILBREAK LOGIC (YE BILKUL THEEK HAI) ---
+
     private func isJailbroken() -> Bool {
+        // Agar Simulator hai to Jailbreak check skip karo (False positives se bachne ke liye)
+        if !isRealDevice() {
+            return false
+        }
         return checkFilePaths() || checkURLSchemes() || canWriteOutsideSandbox()
     }
 
@@ -50,6 +72,8 @@ public class SwiftFlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
     }
 
     private func checkURLSchemes() -> Bool {
+        // URL Schemes check karne ke liye Info.plist mein allow-list honi chahiye, 
+        // lekin ye code safe backup hai.
         if let cydiaURL = URL(string: "cydia://package/com.example.package") {
             if UIApplication.shared.canOpenURL(cydiaURL) {
                 return true
@@ -59,7 +83,7 @@ public class SwiftFlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
     }
 
     private func canWriteOutsideSandbox() -> Bool {
-        let path = "/private/jailbreak.txt"
+        let path = "/private/jailbreak_test.txt"
         do {
             try "Jailbreak Test".write(toFile: path, atomically: true, encoding: .utf8)
             try FileManager.default.removeItem(atPath: path)

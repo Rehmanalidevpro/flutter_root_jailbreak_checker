@@ -1,5 +1,6 @@
 // example/lib/main.dart
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_root_jailbreak_checker/flutter_root_jailbreak_checker.dart';
 
@@ -13,50 +14,45 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String _status = "Press the button to check device integrity.";
+  String _status = "Press the button to scan.";
   bool _isSafe = true;
   bool _isLoading = false;
 
-  // TODO: Enter your Google Cloud Project Number to enable Online Checks.
-  // Example: "123456789012". Keep it null to run Offline Check only.
-  final String? _googleProjectNumber = null;
+  // TODO: Add Google Cloud Project Number for Android Online Check (or null)
+  final String? _projectNumber = "1234567890";
 
-  Future<void> _checkIntegrity() async {
+  Future<void> _runCheck() async {
     setState(() => _isLoading = true);
-
     final checker = FlutterRootJailbreakChecker();
-    final bool useOnline = _googleProjectNumber != null;
+
+    // Only use Play Integrity on Android if project number is provided
+    final bool useOnline = Platform.isAndroid && _projectNumber != null;
 
     try {
-      // 1. Warm up the API if using online check (Android only)
       if (useOnline) {
-        await checker.preparePlayIntegrity(_googleProjectNumber!);
+        await checker.preparePlayIntegrity(_projectNumber!);
       }
 
-      // 2. Configure the integrity check
       final config = IntegrityCheckConfig(
         blockIfRootedOrJailbroken: true,
         blockIfEmulatorOrSimulator: true,
         usePlayIntegrity: useOnline,
-        cloudProjectNumber: _googleProjectNumber,
+        cloudProjectNumber: _projectNumber,
       );
 
-      // 3. Execute the check
       final result = await checker.check(config);
 
-      // 4. Update UI based on the result
       setState(() {
         _isSafe = result.isSecure(config);
-        if (_isSafe) {
-          _status =
-              "✅ Device is Secure\n"
-              "${useOnline ? '(Online Verified)' : '(Offline Check)'}";
-        } else {
-          _status =
-              "⚠️ Security Risk Detected:\n"
-              "Rooted/Jailbroken: ${result.isRooted || result.isJailbroken}\n"
-              "Emulator: ${result.isEmulator}\n"
-              "Tampered: ${result.playIntegrityError ?? 'No API Error'}";
+        _status = _isSafe ? "✅ Device is Secure" : "⚠️ Security Risk Detected";
+
+        if (!_isSafe) {
+          _status +=
+              "\nRoot/Jailbreak: ${result.isRooted || result.isJailbroken}";
+          _status += "\nEmulator: ${result.isEmulator}";
+          if (useOnline)
+            _status +=
+                "\nIntegrity Error: ${result.playIntegrityError ?? 'None'}";
         }
       });
     } finally {
@@ -67,39 +63,42 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Root & Jailbreak Checker")),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_isLoading)
-              const CircularProgressIndicator()
-            else ...[
-              Icon(
-                _isSafe ? Icons.security : Icons.warning_amber_rounded,
-                size: 80,
-                color: _isSafe ? Colors.green : Colors.red,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                _status,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
+      appBar: AppBar(title: const Text("Integrity Checker")),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_isLoading)
+                const CircularProgressIndicator()
+              else ...[
+                Icon(
+                  _isSafe ? Icons.check_circle : Icons.warning_rounded,
+                  size: 100,
+                  color: _isSafe ? Colors.green : Colors.red,
                 ),
-              ),
+                const SizedBox(height: 20),
+                Text(
+                  _status,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _runCheck,
+                    child: const Text("Scan Device Now"),
+                  ),
+                ),
+              ],
             ],
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _checkIntegrity,
-                child: const Text("Run Integrity Check"),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

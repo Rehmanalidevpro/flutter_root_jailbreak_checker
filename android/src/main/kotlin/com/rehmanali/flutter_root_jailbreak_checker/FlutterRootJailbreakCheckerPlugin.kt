@@ -6,7 +6,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
-// --- FINAL & CORRECT IMPORTS FOR YOUR DEPENDENCIES ---
 import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.IntegrityTokenRequest
 import com.google.android.play.core.integrity.IntegrityTokenResponse
@@ -15,7 +14,6 @@ import com.google.android.play.core.integrity.StandardIntegrityManager
 import com.google.android.play.core.integrity.StandardIntegrityToken
 import com.google.android.play.core.integrity.StandardIntegrityTokenProvider
 import com.google.android.play.core.integrity.StandardIntegrityTokenRequest
-// --- END OF IMPORTS ---
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -33,7 +31,6 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
     private var activity: Activity? = null
-    // BEST PRACTICE: Ek dedicated coroutine scope banayen jo plugin ki lifecycle ke sath manage ho.
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var standardIntegrityTokenProvider: StandardIntegrityTokenProvider? = null
 
@@ -53,7 +50,7 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
                     else -> result.notImplemented()
                 }
             } catch (e: Exception) {
-                result.error("NATIVE_ERROR", e.message ?: "Unknown native error", e.stackTraceToString())
+                result.error("NATIVE_ERROR", e.message ?: "Unknown native error", null)
             }
         }
     }
@@ -62,7 +59,7 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
         val cloudProjectNumber = call.argument<String>("cloudProjectNumber")?.toLongOrNull()
             ?: return result.error("MISSING_ARG", "Cloud project number is required.", null)
 
-        val standardIntegrityManager: StandardIntegrityManager = IntegrityManagerFactory.createStandard(context)
+        val standardIntegrityManager = IntegrityManagerFactory.createStandard(context)
 
         standardIntegrityTokenProvider = standardIntegrityManager.prepareIntegrityToken(
             PrepareIntegrityTokenRequest.builder()
@@ -81,16 +78,27 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
 
         if (requestHash != null) {
             val provider = standardIntegrityTokenProvider
-                ?: return result.error("PROVIDER_NOT_READY", "StandardIntegrityTokenProvider not prepared. Call preparePlayIntegrity() first.", null)
-
-            val tokenResponse: StandardIntegrityToken = provider.request(
+            if (provider == null) {
+                // Auto-prepare if not ready (Safety Fallback)
+                if (cloudProjectNumber != null) {
+                   val manager = IntegrityManagerFactory.createStandard(context)
+                   standardIntegrityTokenProvider = manager.prepareIntegrityToken(
+                       PrepareIntegrityTokenRequest.builder().setCloudProjectNumber(cloudProjectNumber).build()
+                   ).await()
+                } else {
+                   return result.error("PROVIDER_NOT_READY", "Call preparePlayIntegrity() first.", null)
+                }
+            }
+            
+            val tokenResponse = standardIntegrityTokenProvider!!.request(
                 StandardIntegrityTokenRequest.builder().setRequestHash(requestHash).build()
             ).await()
             token = tokenResponse.token()
+
         } else if (nonce != null) {
-            if (cloudProjectNumber == null) return result.error("MISSING_ARG", "Cloud project number is required for classic requests.", null)
+            if (cloudProjectNumber == null) return result.error("MISSING_ARG", "Cloud project number required.", null)
             val integrityManager = IntegrityManagerFactory.create(context)
-            val tokenResponse: IntegrityTokenResponse = integrityManager.requestIntegrityToken(
+            val tokenResponse = integrityManager.requestIntegrityToken(
                 IntegrityTokenRequest.builder()
                     .setNonce(nonce)
                     .setCloudProjectNumber(cloudProjectNumber)
@@ -103,34 +111,102 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
         result.success(token)
     }
 
-    // BEST PRACTICE: Blocking I/O operations (file checks) ko IO Dispatcher par chalayen.
     private suspend fun performOfflineChecks(): HashMap<String, Any> = withContext(Dispatchers.IO) {
         val results = HashMap<String, Any>()
         results["isRooted"] = isDeviceRooted()
-        results["isDeveloperModeEnabled"] = isDeveloperModeEnabled() // Yeh non-blocking hai, lekin yahan rakhna theek hai.
+        results["isDeveloperModeEnabled"] = isDeveloperModeEnabled()
         results["isEmulator"] = isEmulator()
         results["hasPotentiallyDangerousApps"] = hasPotentiallyDangerousApps()
-        // iOS specific keys
+        // iOS specific keys (Android pe false hi rahenge)
         results["isJailbroken"] = false
         results["isRealDevice"] = true
         return@withContext results
     }
 
-    // --- Aapka Original Offline Check Code ---
-    private fun isDeveloperModeEnabled(): Boolean = Settings.Secure.getInt(context.contentResolver, "development_settings_enabled", 0) != 0
-    private fun isEmulator(): Boolean = (android.os.Build.FINGERPRINT.startsWith("generic") || android.os.Build.FINGERPRINT.startsWith("unknown") || android.os.Build.MODEL.contains("google_sdk") || android.os.Build.MODEL.contains("Emulator") || android.os.Build.MODEL.contains("Android SDK built for x86") || android.os.Build.MANUFACTURER.contains("Genymotion") || (android.os.Build.BRAND.startsWith("generic") && android.os.Build.DEVICE.startsWith("generic")) || "google_sdk" == android.os.Build.PRODUCT)
-    private fun hasPotentiallyDangerousApps(): Boolean { /* ... Aapka purana code yahan aayega ... */ return false }
-    private fun isDeviceRooted(): Boolean = checkRootMethod1() || checkRootMethod2() || checkRootMethod3() || checkRootMethod4() || checkRootMethod5()
-    private fun checkRootMethod1(): Boolean = android.os.Build.TAGS?.contains("test-keys") ?: false
-    private fun checkRootMethod2(): Boolean { /* ... Aapka purana code yahan aayega ... */ return false }
-    private fun checkRootMethod3(): Boolean { /* ... Aapka purana code yahan aayega ... */ return false }
-    private fun checkRootMethod4(): Boolean { /* ... Aapka purana code yahan aayega ... */ return false }
-    private fun checkRootMethod5(): Boolean { /* ... Aapka purana code yahan aayega ... */ return false }
+    // --- REAL LOGIC IMPLEMENTATION ---
+
+    private fun isDeveloperModeEnabled(): Boolean {
+        return Settings.Secure.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) != 0
+    }
+
+    private fun isEmulator(): Boolean {
+        return (android.os.Build.FINGERPRINT.startsWith("generic")
+                || android.os.Build.FINGERPRINT.startsWith("unknown")
+                || android.os.Build.MODEL.contains("google_sdk")
+                || android.os.Build.MODEL.contains("Emulator")
+                || android.os.Build.MODEL.contains("Android SDK built for x86")
+                || android.os.Build.MANUFACTURER.contains("Genymotion")
+                || (android.os.Build.BRAND.startsWith("generic") && android.os.Build.DEVICE.startsWith("generic"))
+                || "google_sdk" == android.os.Build.PRODUCT)
+    }
+
+    private fun hasPotentiallyDangerousApps(): Boolean {
+        val dangerousPackages = arrayOf(
+            "com.topjohnwu.magisk",
+            "com.thirdparty.superuser",
+            "eu.chainfire.supersu",
+            "com.noshufou.android.su",
+            "com.koushikdutta.superuser",
+            "com.zachspenner.zbuster",
+            "com.ramdroid.appquarantine",
+            "com.devadvance.rootcloak"
+        )
+        val pm = context.packageManager
+        for (pkg in dangerousPackages) {
+            try {
+                pm.getPackageInfo(pkg, 0)
+                return true
+            } catch (e: PackageManager.NameNotFoundException) {
+                // App not found, safe.
+            }
+        }
+        return false
+    }
+
+    private fun isDeviceRooted(): Boolean {
+        return checkRootMethod1() || checkRootMethod2() || checkRootMethod3()
+    }
+
+    private fun checkRootMethod1(): Boolean {
+        val buildTags = android.os.Build.TAGS
+        return buildTags != null && buildTags.contains("test-keys")
+    }
+
+    private fun checkRootMethod2(): Boolean {
+        val paths = arrayOf(
+            "/system/app/Superuser.apk",
+            "/sbin/su",
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/data/local/xbin/su",
+            "/data/local/bin/su",
+            "/system/sd/xbin/su",
+            "/system/bin/failsafe/su",
+            "/data/local/su",
+            "/su/bin/su"
+        )
+        for (path in paths) {
+            if (File(path).exists()) return true
+        }
+        return false
+    }
+
+    private fun checkRootMethod3(): Boolean {
+        var process: Process? = null
+        return try {
+            process = Runtime.getRuntime().exec(arrayOf("/system/xbin/which", "su"))
+            val inStream = BufferedReader(InputStreamReader(process.inputStream))
+            inStream.readLine() != null
+        } catch (t: Throwable) {
+            false
+        } finally {
+            process?.destroy()
+        }
+    }
 
     // --- Lifecycle Methods ---
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
-        // BEST PRACTICE: Scope ko cancel karain takay memory leaks na hon.
         coroutineScope.cancel()
     }
     override fun onAttachedToActivity(binding: ActivityPluginBinding) { activity = binding.activity }

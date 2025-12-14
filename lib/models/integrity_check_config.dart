@@ -55,7 +55,7 @@ class IntegrityCheckConfig {
     this.nonce,
     this.requestHash,
   }) : assert(
-         !usePlayIntegrity || cloudProjectNumber != null,
-         'cloudProjectNumber cannot be null when usePlayIntegrity is true.',
-       );
+          !usePlayIntegrity || cloudProjectNumber != null,
+          'cloudProjectNumber cannot be null when usePlayIntegrity is true.',
+        );
 }

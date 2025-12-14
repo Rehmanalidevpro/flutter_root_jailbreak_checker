@@ -1,3 +1,9 @@
+## 2.1.4
+
+*   **Fixed (Android):** Resolved Gradle dependencies for Google Play Integrity API.
+*   **Fixed (iOS):** Corrected method channel names to match Dart implementation.
+*   **Improved:** Stability improvements for both Offline and Online checks.
+
 ## 2.1.3
 
 *   **Updated:** Added package `topics` for better search ranking on pub.dev.
