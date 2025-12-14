@@ -1,19 +1,19 @@
-// android/src/main/kotlin/com/rehmanali/flutter_root_jailbreak_checker/FlutterRootJailbreakCheckerPlugin.kt
-
 package com.rehmanali.flutter_root_jailbreak_checker
 
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.os.Build
+
+// --- GOOGLE PLAY INTEGRITY IMPORTS ---
 import com.google.android.play.core.integrity.IntegrityManagerFactory
-import com.google.android.play.core.integrity.IntegrityTokenRequest
-import com.google.android.play.core.integrity.IntegrityTokenResponse
-import com.google.android.play.core.integrity.PrepareIntegrityTokenRequest
 import com.google.android.play.core.integrity.StandardIntegrityManager
-import com.google.android.play.core.integrity.StandardIntegrityToken
-import com.google.android.play.core.integrity.StandardIntegrityTokenProvider
-import com.google.android.play.core.integrity.StandardIntegrityTokenRequest
+import com.google.android.play.core.integrity.StandardIntegrityManager.StandardIntegrityTokenProvider
+import com.google.android.play.core.integrity.StandardIntegrityManager.PrepareIntegrityTokenRequest
+import com.google.android.play.core.integrity.StandardIntegrityManager.StandardIntegrityTokenRequest
+
+// --- FLUTTER IMPORTS ---
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -21,18 +21,32 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+
+// --- UTILS IMPORTS ---
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 
+/**
+ * FlutterRootJailbreakCheckerPlugin
+ * Top-Class Implementation for Root, Emulator & Integrity Checks.
+ */
 class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, ActivityAware {
+
+    // Flutter Communication
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
     private var activity: Activity? = null
+
+    // Coroutine Scope for Background Tasks (Prevents UI Lag)
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    // Cache for Play Integrity Provider
     private var standardIntegrityTokenProvider: StandardIntegrityTokenProvider? = null
+
+    // --- LIFECYCLE METHODS ---
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_root_jailbreak_checker")
@@ -40,106 +54,153 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
         context = flutterPluginBinding.applicationContext
     }
 
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+        coroutineScope.cancel() // Clean up to prevent memory leaks
+    }
+
+    // --- METHOD CHANNEL HANDLER ---
+
     override fun onMethodCall(call: MethodCall, result: Result) {
+        // Launching a coroutine to handle async tasks safely
         coroutineScope.launch {
             try {
                 when (call.method) {
-                    "checkOfflineIntegrity" -> result.success(performOfflineChecks())
+                    "checkOfflineIntegrity" -> {
+                        // Switch to IO thread for heavy checks
+                        val checkResult = performOfflineChecks()
+                        result.success(checkResult)
+                    }
                     "preparePlayIntegrity" -> handlePreparePlayIntegrity(call, result)
                     "requestPlayIntegrityToken" -> handleRequestPlayIntegrityToken(call, result)
                     else -> result.notImplemented()
                 }
             } catch (e: Exception) {
-                result.error("NATIVE_ERROR", e.message ?: "Unknown native error", null)
+                // Global Error Handling: App won't crash, it sends error to Flutter
+                result.error("NATIVE_ERROR", e.message ?: "Unknown error occurred", null)
             }
         }
     }
 
+    // --- GOOGLE PLAY INTEGRITY LOGIC (ONLINE) ---
+
     private suspend fun handlePreparePlayIntegrity(call: MethodCall, result: Result) {
-        val cloudProjectNumber = call.argument<String>("cloudProjectNumber")?.toLongOrNull()
-            ?: return result.error("MISSING_ARG", "Cloud project number is required.", null)
+        val cloudProjectNumberStr = call.argument<String>("cloudProjectNumber")
 
-        val standardIntegrityManager = IntegrityManagerFactory.createStandard(context)
+        if (cloudProjectNumberStr.isNullOrEmpty()) {
+            result.error("MISSING_ARG", "Cloud Project Number is required.", null)
+            return
+        }
 
-        standardIntegrityTokenProvider = standardIntegrityManager.prepareIntegrityToken(
-            PrepareIntegrityTokenRequest.builder()
+        val cloudProjectNumber = cloudProjectNumberStr.toLongOrNull() ?: 0L
+
+        try {
+            val standardIntegrityManager = IntegrityManagerFactory.createStandard(context)
+
+            // Build Request
+            val requestBuilder = PrepareIntegrityTokenRequest.builder()
                 .setCloudProjectNumber(cloudProjectNumber)
                 .build()
-        ).await()
 
-        result.success(true)
+            // Await Result from Google
+            standardIntegrityTokenProvider = standardIntegrityManager.prepareIntegrityToken(requestBuilder).await()
+
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("PREPARE_FAILED", e.message, null)
+        }
     }
 
     private suspend fun handleRequestPlayIntegrityToken(call: MethodCall, result: Result) {
-        val cloudProjectNumber = call.argument<String>("cloudProjectNumber")?.toLongOrNull()
+        val cloudProjectNumberStr = call.argument<String>("cloudProjectNumber")
         val requestHash = call.argument<String>("requestHash")
-        val nonce = call.argument<String>("nonce")
-        val token: String?
 
-        if (requestHash != null) {
-            val provider = standardIntegrityTokenProvider
-            if (provider == null) {
-                // Auto-prepare if not ready (Safety Fallback)
-                if (cloudProjectNumber != null) {
-                   val manager = IntegrityManagerFactory.createStandard(context)
-                   standardIntegrityTokenProvider = manager.prepareIntegrityToken(
-                       PrepareIntegrityTokenRequest.builder().setCloudProjectNumber(cloudProjectNumber).build()
-                   ).await()
+        try {
+            // Auto-prepare if not ready
+            if (standardIntegrityTokenProvider == null) {
+                if (!cloudProjectNumberStr.isNullOrEmpty()) {
+                    val cloudProjectNumber = cloudProjectNumberStr.toLongOrNull() ?: 0L
+                    val manager = IntegrityManagerFactory.createStandard(context)
+                    val req = PrepareIntegrityTokenRequest.builder()
+                        .setCloudProjectNumber(cloudProjectNumber)
+                        .build()
+                    standardIntegrityTokenProvider = manager.prepareIntegrityToken(req).await()
                 } else {
-                   return result.error("PROVIDER_NOT_READY", "Call preparePlayIntegrity() first.", null)
+                    result.error("PROVIDER_NOT_READY", "Call preparePlayIntegrity() first or provide cloudProjectNumber.", null)
+                    return
                 }
             }
-            
-            val tokenResponse = standardIntegrityTokenProvider!!.request(
-                StandardIntegrityTokenRequest.builder().setRequestHash(requestHash).build()
-            ).await()
-            token = tokenResponse.token()
 
-        } else if (nonce != null) {
-            if (cloudProjectNumber == null) return result.error("MISSING_ARG", "Cloud project number required.", null)
-            val integrityManager = IntegrityManagerFactory.create(context)
-            val tokenResponse = integrityManager.requestIntegrityToken(
-                IntegrityTokenRequest.builder()
-                    .setNonce(nonce)
-                    .setCloudProjectNumber(cloudProjectNumber)
-                    .build()
-            ).await()
-            token = tokenResponse.token()
-        } else {
-            return result.error("MISSING_ARG", "Either 'requestHash' or 'nonce' must be provided.", null)
+            val provider = standardIntegrityTokenProvider!!
+
+            // Build Token Request
+            val tokenReqBuilder = StandardIntegrityTokenRequest.builder()
+            if (requestHash != null) {
+                tokenReqBuilder.setRequestHash(requestHash)
+            }
+
+            // Fetch Token
+            val tokenResponse = provider.request(tokenReqBuilder.build()).await()
+            result.success(tokenResponse.token())
+
+        } catch (e: Exception) {
+            result.error("TOKEN_FAILED", e.message, null)
         }
-        result.success(token)
     }
+
+    // --- OFFLINE CHECKS LOGIC (The Core Security) ---
 
     private suspend fun performOfflineChecks(): HashMap<String, Any> = withContext(Dispatchers.IO) {
         val results = HashMap<String, Any>()
+
+        // Parallel checks or sequential checks on IO thread
         results["isRooted"] = isDeviceRooted()
         results["isDeveloperModeEnabled"] = isDeveloperModeEnabled()
         results["isEmulator"] = isEmulator()
         results["hasPotentiallyDangerousApps"] = hasPotentiallyDangerousApps()
-        // iOS specific keys (Android pe false hi rahenge)
+
+        // Default values for Android
         results["isJailbroken"] = false
         results["isRealDevice"] = true
+
         return@withContext results
     }
 
-    // --- REAL LOGIC IMPLEMENTATION ---
-
+    // 1. Developer Mode Check
     private fun isDeveloperModeEnabled(): Boolean {
-        return Settings.Secure.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) != 0
+        return Settings.Secure.getInt(
+            context.contentResolver,
+            Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0
+        ) != 0
     }
 
+    // 2. Emulator Detection (Comprehensive)
     private fun isEmulator(): Boolean {
-        return (android.os.Build.FINGERPRINT.startsWith("generic")
-                || android.os.Build.FINGERPRINT.startsWith("unknown")
-                || android.os.Build.MODEL.contains("google_sdk")
-                || android.os.Build.MODEL.contains("Emulator")
-                || android.os.Build.MODEL.contains("Android SDK built for x86")
-                || android.os.Build.MANUFACTURER.contains("Genymotion")
-                || (android.os.Build.BRAND.startsWith("generic") && android.os.Build.DEVICE.startsWith("generic"))
-                || "google_sdk" == android.os.Build.PRODUCT)
+        val brand = Build.BRAND
+        val device = Build.DEVICE
+        val fingerprint = Build.FINGERPRINT
+        val model = Build.MODEL
+        val manufacturer = Build.MANUFACTURER
+        val product = Build.PRODUCT
+        val hardware = Build.HARDWARE
+
+        return fingerprint.startsWith("generic")
+                || fingerprint.startsWith("unknown")
+                || model.contains("google_sdk")
+                || model.contains("Emulator")
+                || model.contains("Android SDK built for x86")
+                || manufacturer.contains("Genymotion")
+                || (brand.startsWith("generic") && device.startsWith("generic"))
+                || "google_sdk" == product
+                || hardware.contains("goldfish")
+                || hardware.contains("ranchu")
+                || product.contains("sdk_google")
+                || product.contains("vbox86p")
+                || product.contains("emulator")
+                || product.contains("simulator")
     }
 
+    // 3. Dangerous Apps Detection (Root Tools)
     private fun hasPotentiallyDangerousApps(): Boolean {
         val dangerousPackages = arrayOf(
             "com.topjohnwu.magisk",
@@ -149,29 +210,34 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
             "com.koushikdutta.superuser",
             "com.zachspenner.zbuster",
             "com.ramdroid.appquarantine",
-            "com.devadvance.rootcloak"
+            "com.devadvance.rootcloak",
+            "de.robv.android.xposed.installer"
         )
+
         val pm = context.packageManager
         for (pkg in dangerousPackages) {
             try {
                 pm.getPackageInfo(pkg, 0)
-                return true
+                return true // Found a dangerous app
             } catch (e: PackageManager.NameNotFoundException) {
-                // App not found, safe.
+                // App not found, continue checking
             }
         }
         return false
     }
 
+    // 4. Root Detection (Multiple Methods)
     private fun isDeviceRooted(): Boolean {
         return checkRootMethod1() || checkRootMethod2() || checkRootMethod3()
     }
 
+    // Method 1: Check Build Tags
     private fun checkRootMethod1(): Boolean {
-        val buildTags = android.os.Build.TAGS
+        val buildTags = Build.TAGS
         return buildTags != null && buildTags.contains("test-keys")
     }
 
+    // Method 2: Check Standard SU Paths
     private fun checkRootMethod2(): Boolean {
         val paths = arrayOf(
             "/system/app/Superuser.apk",
@@ -191,6 +257,7 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
         return false
     }
 
+    // Method 3: Execute SU command
     private fun checkRootMethod3(): Boolean {
         var process: Process? = null
         return try {
@@ -204,11 +271,7 @@ class FlutterRootJailbreakCheckerPlugin: FlutterPlugin, MethodCallHandler, Activ
         }
     }
 
-    // --- Lifecycle Methods ---
-    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
-        coroutineScope.cancel()
-    }
+    // --- Activity Aware (Required for some plugins, kept for safety) ---
     override fun onAttachedToActivity(binding: ActivityPluginBinding) { activity = binding.activity }
     override fun onDetachedFromActivity() { activity = null }
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) { activity = binding.activity }

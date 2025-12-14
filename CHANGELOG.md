@@ -1,3 +1,9 @@
+## 2.1.5
+*   **Critical Fix:** Resolved Android build dependencies and Gradle errors.
+*   **Enhanced:** Improved offline detection logic for Root and Jailbreak.
+*   **UI:** Updated example app with a detailed integrity dashboard.
+
+
 ## 2.1.4
 
 *   **Fixed (Android):** Resolved Gradle dependencies for Google Play Integrity API.
