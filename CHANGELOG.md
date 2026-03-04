@@ -1,3 +1,7 @@
+## 2.1.6
+* [iOS] Fixed build failure caused by incorrect plugin class reference.
+
+
 ## 2.1.5
 *   **Critical Fix:** Resolved Android build dependencies and Gradle errors.
 *   **Enhanced:** Improved offline detection logic for Root and Jailbreak.

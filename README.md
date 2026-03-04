@@ -35,7 +35,7 @@ Add to your project's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_root_jailbreak_checker: ^2.1.5
+  flutter_root_jailbreak_checker: ^2.1.6
 ```
 
 Then run:
@@ -185,9 +185,25 @@ GitHub: @rehmanalidevpro
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome. Submit issues or pull requests via the GitHub repository.
+Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+### ✨ Contributors
+
+Special thanks to these amazing people who have helped improve this project:
+
+| Contributor | Contribution | Profile |
+| :--- | :--- | :--- |
+| **Rehman Ali** | Project Creator & Maintainer | [@rehmanalidevpro](https://github.com/rehmanalidevpro) |
+| **SuperMari000** | iOS Build & Semantic Issue Fix | [@SuperMari000](https://github.com/SuperMari000) |
+
+**How to contribute:**
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 

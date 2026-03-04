@@ -1,16 +1,26 @@
-// example/lib/main.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_root_jailbreak_checker/flutter_root_jailbreak_checker.dart';
 
-void main() => runApp(
-  const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: IntegrityScannerPage(),
-  ),
-);
+void main() {
+  runApp(const RootCheckerExampleApp());
+}
 
+/// Main Application Entry Point
+class RootCheckerExampleApp extends StatelessWidget {
+  const RootCheckerExampleApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      title: 'Integrity Scanner Pro',
+      debugShowCheckedModeBanner: false,
+      home: IntegrityScannerPage(),
+    );
+  }
+}
+
+/// Page responsible for scanning and displaying device integrity status
 class IntegrityScannerPage extends StatefulWidget {
   const IntegrityScannerPage({super.key});
 
@@ -22,38 +32,39 @@ class _IntegrityScannerPageState extends State<IntegrityScannerPage> {
   bool _isScanning = false;
   DeviceIntegrityResult? _result;
 
-  // TODO: Enter Google Cloud Project Number for Online Check (Android only).
-  // Keep null to run Offline Check only.
-  final String? _cloudProjectNumber = null; // e.g., "1234567890"
+  // Cloud Project Number for Google Play Integrity (Android only)
+  // Set this to your actual project number to enable online checks
+  final String? _cloudProjectNumber = null; 
 
+  /// Executes the scanning process
   Future<void> _startScan() async {
     setState(() => _isScanning = true);
 
-    // 1. Initialize Checker
     final checker = FlutterRootJailbreakChecker();
-    final bool useOnline = Platform.isAndroid && _cloudProjectNumber != null;
+    final bool useOnlineCheck = Platform.isAndroid && _cloudProjectNumber != null;
 
     try {
-      // 2. Prepare Online API (if applicable)
-      if (useOnline) {
-        await checker.preparePlayIntegrity(_cloudProjectNumber!);
+      // Step 1: Initialize Online API if credentials are provided
+      if (useOnlineCheck) {
+        await checker.preparePlayIntegrity(_cloudProjectNumber);
       }
 
-      // 3. Configure Checks
+      // Step 2: Configure scan parameters
       final config = IntegrityCheckConfig(
         blockIfRootedOrJailbroken: true,
         blockIfEmulatorOrSimulator: true,
-        blockIfDeveloperMode:
-            false, // We just want to detect it, not block immediately
-        usePlayIntegrity: useOnline,
+        blockIfDeveloperMode: false,
+        usePlayIntegrity: useOnlineCheck,
         cloudProjectNumber: _cloudProjectNumber,
       );
 
-      // 4. Run Check
+      // Step 3: Perform the comprehensive integrity check
       final result = await checker.check(config);
 
       if (!mounted) return;
       setState(() => _result = result);
+    } catch (e) {
+      debugPrint("Integrity Scan Failed: $e");
     } finally {
       setState(() => _isScanning = false);
     }
@@ -62,167 +73,74 @@ class _IntegrityScannerPageState extends State<IntegrityScannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Device Integrity Scanner")),
-      body: Padding(
+      appBar: AppBar(
+        title: const Text("Device Integrity Scanner"),
+        centerTitle: true,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // --- Top Status Card ---
-            _buildStatusHeader(),
+            if (_result != null) _buildStatusHeader(),
             const SizedBox(height: 20),
-
-            // --- Detailed Checks List ---
-            Expanded(
-              child: _result == null
-                  ? const Center(child: Text("Press 'Scan' to start."))
-                  : ListView(
-                      children: [
-                        _buildCheckTile(
-                          "Root / Jailbreak",
-                          _result!.isRooted || _result!.isJailbroken,
-                          isDanger: true,
-                        ),
-                        _buildCheckTile(
-                          "Emulator / Simulator",
-                          _result!.isEmulator || !_result!.isRealDevice,
-                          isDanger: true,
-                        ),
-                        _buildCheckTile(
-                          "Developer Mode / Debugging",
-                          _result!.isDeveloperModeEnabled,
-                          isDanger: true, // Mark as warning
-                        ),
-                        _buildCheckTile(
-                          "Dangerous Apps (Root Tools)",
-                          _result!.hasPotentiallyDangerousApps,
-                          isDanger: true,
-                        ),
-                        if (_result!.playIntegrityToken != null ||
-                            _result!.playIntegrityError != null)
-                          _buildCheckTile(
-                            "Google Play Integrity (Online)",
-                            !_result!
-                                .wasPlayIntegritySuccessful, // If not successful, it's bad
-                            isDanger: true,
-                            details:
-                                _result!.playIntegrityError ??
-                                "Verified & Valid",
-                          ),
-                      ],
-                    ),
-            ),
-
-            // --- Action Button ---
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _isScanning ? null : _startScan,
-                icon: _isScanning
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.security),
-                label: Text(_isScanning ? "Scanning..." : "Scan Device Now"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
+            if (_result != null) ...[
+              _buildCheckTile("Root Access / Jailbreak", _result!.isRooted || _result!.isJailbroken),
+              _buildCheckTile("Emulator Detection", _result!.isEmulator || !_result!.isRealDevice),
+              _buildCheckTile("Developer Mode", _result!.isDeveloperModeEnabled),
+              _buildCheckTile("Dangerous Applications", _result!.hasPotentiallyDangerousApps),
+            ] else 
+              const Center(child: Text("Ready to scan device integrity status.")),
           ],
+        ),
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ElevatedButton.icon(
+          onPressed: _isScanning ? null : _startScan,
+          icon: _isScanning 
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+              : const Icon(Icons.security),
+          label: Text(_isScanning ? "Processing..." : "Run Security Scan"),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         ),
       ),
     );
   }
 
-  // Widget to display the big top status
+  /// Displays the top-level safety status
   Widget _buildStatusHeader() {
-    if (_result == null) return const SizedBox.shrink();
-
-    // Determine overall safety based on config
-    final isSafe =
-        !_result!.isRooted &&
-        !_result!.isJailbroken &&
-        !_result!.hasPotentiallyDangerousApps &&
-        (!_result!.isEmulator && _result!.isRealDevice);
-
+    final bool isSafe = !(_result!.isRooted || _result!.isJailbroken || _result!.isEmulator);
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isSafe ? Colors.green.shade50 : Colors.red.shade50,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: isSafe ? Colors.green : Colors.red, width: 2),
+        border: Border.all(color: isSafe ? Colors.green : Colors.red),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(
-            isSafe ? Icons.check_circle : Icons.gpp_bad,
-            size: 50,
-            color: isSafe ? Colors.green : Colors.red,
-          ),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isSafe ? "DEVICE SECURE" : "THREAT DETECTED",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: isSafe ? Colors.green.shade800 : Colors.red.shade800,
-                ),
-              ),
-              Text(
-                isSafe ? "No integrity issues found" : "Review the list below",
-                style: const TextStyle(color: Colors.black54),
-              ),
-            ],
-          ),
+          Icon(isSafe ? Icons.verified_user : Icons.warning, size: 50, color: isSafe ? Colors.green : Colors.red),
+          const SizedBox(height: 10),
+          Text(isSafe ? "DEVICE SECURE" : "SECURITY RISK DETECTED", 
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isSafe ? Colors.green : Colors.red)),
         ],
       ),
     );
   }
 
-  // Widget for individual check rows
-  Widget _buildCheckTile(
-    String title,
-    bool isDetected, {
-    bool isDanger = false,
-    String? details,
-  }) {
-    // Logic: If detecting a threat (isDanger=true), 'True' is Bad (Red).
-    final bool isBad = isDanger && isDetected;
-
+  /// Reusable tile for individual security checks
+  Widget _buildCheckTile(String title, bool isDetected) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 2,
       child: ListTile(
-        leading: Icon(
-          isBad ? Icons.cancel : Icons.check_circle,
-          color: isBad ? Colors.red : Colors.green,
-          size: 30,
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: details != null
-            ? Text(details)
-            : Text(isDetected ? "Detected (Unsafe)" : "Not Detected (Safe)"),
-        trailing: isBad
-            ? const Chip(
-                label: Text("RISK"),
-                backgroundColor: Colors.redAccent,
-                labelStyle: TextStyle(color: Colors.white),
-              )
-            : const Chip(
-                label: Text("SAFE"),
-                backgroundColor: Colors.green,
-                labelStyle: TextStyle(color: Colors.white),
-              ),
+        leading: Icon(isDetected ? Icons.error_outline : Icons.check_circle_outline, 
+          color: isDetected ? Colors.red : Colors.green),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(isDetected ? "Vulnerability Detected" : "Passed"),
       ),
     );
   }
