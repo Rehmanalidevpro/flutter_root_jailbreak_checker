@@ -4,6 +4,12 @@ A streamlined, offline-first Flutter plugin for detecting rooted Android devices
 
 ---
 
+[![pub package](https://img.shields.io/pub/v/flutter_root_jailbreak_checker.svg)](https://pub.dev/packages/flutter_root_jailbreak_checker)
+[![likes](https://img.shields.io/pub/likes/flutter_root_jailbreak_checker)](https://pub.dev/packages/flutter_root_jailbreak_checker/score)
+
+
+---
+
 ## Key Capabilities
 
 * **Comprehensive Android Root Detection:** Multiple checks including `su` binaries, build tags, system properties, and unsafe partitions.
