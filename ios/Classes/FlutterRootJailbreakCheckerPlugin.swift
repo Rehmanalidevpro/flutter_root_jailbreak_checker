@@ -3,11 +3,11 @@
 import Flutter
 import UIKit
 
-public class SwiftFlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
+public class FlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter_root_jailbreak_checker", binaryMessenger: registrar.messenger())
-        let instance = SwiftFlutterRootJailbreakCheckerPlugin()
+        let instance = FlutterRootJailbreakCheckerPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
 
