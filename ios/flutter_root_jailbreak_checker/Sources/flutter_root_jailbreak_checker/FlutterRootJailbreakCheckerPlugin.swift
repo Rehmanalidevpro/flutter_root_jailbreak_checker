@@ -1,10 +1,8 @@
-// ios/Classes/FlutterRootJailbreakCheckerPlugin.swift
-
 import Flutter
 import UIKit
 
 public class FlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
-    
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter_root_jailbreak_checker", binaryMessenger: registrar.messenger())
         let instance = FlutterRootJailbreakCheckerPlugin()
@@ -14,10 +12,10 @@ public class FlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         // ERROR FIX 1: Method name must match Dart code ("checkOfflineIntegrity")
         if call.method == "checkOfflineIntegrity" {
-            
+
             let jailbroken = isJailbroken()
             let realDevice = isRealDevice()
-            
+
             // ERROR FIX 2: Return ALL keys expected by Dart Model (DeviceIntegrityResult)
             var results = [String: Any]()
             results["isJailbroken"] = jailbroken
@@ -26,14 +24,14 @@ public class FlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
             results["isRooted"] = false // iOS never has "Root" (it has Jailbreak)
             results["hasPotentiallyDangerousApps"] = jailbroken // If jailbroken, apps are dangerous
             results["isDeveloperModeEnabled"] = false // Difficult to detect on iOS safely
-            
+
             result(results)
-            
+
         } else if call.method == "preparePlayIntegrity" || call.method == "requestPlayIntegrityToken" {
             // ERROR FIX 3: Handle Online Check calls gracefully on iOS
             // Return error code "UNAVAILABLE" so Dart knows it's not supported on iOS
             result(FlutterError(code: "UNAVAILABLE", message: "Google Play Integrity is Android only.", details: nil))
-            
+
         } else {
             result(FlutterMethodNotImplemented)
         }
@@ -72,7 +70,7 @@ public class FlutterRootJailbreakCheckerPlugin: NSObject, FlutterPlugin {
     }
 
     private func checkURLSchemes() -> Bool {
-        // URL Schemes check karne ke liye Info.plist mein allow-list honi chahiye, 
+        // URL Schemes check karne ke liye Info.plist mein allow-list honi chahiye,
         // lekin ye code safe backup hai.
         if let cydiaURL = URL(string: "cydia://package/com.example.package") {
             if UIApplication.shared.canOpenURL(cydiaURL) {

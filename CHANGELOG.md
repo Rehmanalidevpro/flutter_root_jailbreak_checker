@@ -1,3 +1,7 @@
+## 2.1.7
+* [iOS] Added Swift Package Manager support. The iOS platform code now ships as a Swift package at `ios/flutter_root_jailbreak_checker/`.
+* [iOS] CocoaPods is still fully supported — the podspec now points at the new source location. Existing apps need no changes.
+
 ## 2.1.6
 * [iOS] Fixed build failure caused by incorrect plugin class reference.
 
