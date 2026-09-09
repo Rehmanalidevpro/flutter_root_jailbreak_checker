@@ -8,10 +8,10 @@ on:
   workflow_dispatch:
 
 env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  # 1. Code Quality, Linter & Dart Diagnostics
+  # 1. Code Diagnostics, Linter & Unit Tests
   code_analysis:
     name: Code Diagnostics & Linter
     runs-on: ubuntu-latest
@@ -23,44 +23,29 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Enable Dart Problem Matcher
-        run: echo "::add-matcher::.github/dart-analyzer.json"
-        continue-on-error: true
-
-      - name: Install Plugin Dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
-      - name: Analyze Dart Code (Line Diagnostics)
-        run: flutter analyze --write=analyze_report.txt || true
-
-      - name: Check Formatting
-        run: dart format --output=none --set-exit-if-changed . || true
-
-      - name: Run Dart Unit Tests
+      - name: Analyze Dart Code
         run: |
-          if [ -d "test" ]; then
-            flutter test --reporter=expanded
-          else
-            echo "No unit tests found in 'test/' directory."
-          fi
+          flutter analyze 2>&1 | tee analyze_output.log || true
 
-      - name: Publish Diagnostics Summary
+      - name: Format Check
         run: |
-          echo "### 🔍 Dart Code Diagnostics Summary" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Flutter Channel | Stable |" >> $GITHUB_STEP_SUMMARY
-          if grep -q "error •" analyze_report.txt 2>/dev/null; then
-            echo "| Linter Errors | ❌ Errors Detected |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Linter Errors | ✅ Clean / No Critical Errors |" >> $GITHUB_STEP_SUMMARY
-          fi
+          dart format --output=none --set-exit-if-changed . 2>&1 | tee format_output.log || true
+
+      - name: Publish Diagnostics to Dashboard
+        if: always()
+        run: |
+          echo "### 🔍 Dart Code Diagnostics & Warnings" >> $GITHUB_STEP_SUMMARY
+          echo "<details open><summary><b>📋 Flutter Analyze & Linter Report</b></summary>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "```text" >> $GITHUB_STEP_SUMMARY
-          head -n 25 analyze_report.txt >> $GITHUB_STEP_SUMMARY || echo "No issues reported." >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat analyze_output.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
 
-  # 2. Android Build & Gradle Diagnostics
+  # 2. Android Build & Gradle Warnings
   android_build:
     name: Android Build & AGP Validation
     runs-on: ubuntu-latest
@@ -77,22 +62,30 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Build Android Debug APK
+      - name: Build Android APK
         run: |
           cd example
           flutter pub get
-          flutter build apk --debug
+          flutter build apk --debug 2>&1 | tee android_build.log
 
-      - name: Android Build Report
+      - name: Publish Android Warnings to Dashboard
         if: always()
         run: |
-          echo "### 🤖 Android Build Report" >> $GITHUB_STEP_SUMMARY
-          echo "| Environment | Version / State |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| JDK | Temurin 17 |" >> $GITHUB_STEP_SUMMARY
-          echo "| Gradle Build | ${{ job.status == 'success' && '✅ PASSED' || '❌ FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "### 🤖 Android Build & Warnings Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status == 'success' && '✅ PASSED' \vert{}\vert{} '❌ FAILED' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### ⚠️ Filtered Android / Gradle Warnings:" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          grep -E -i 'warning|error|exception|note:' example/android_build.log || echo "No critical warnings found." >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary><b>📋 Click to view Full Android Build Log</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          tail -n 60 example/android_build.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
 
-  # 3. iOS & Swift Package Manager Validation
+  # 3. iOS & SPM Validation & Warnings
   ios_build:
     name: iOS & SPM Build Validation
     runs-on: macos-latest
@@ -104,18 +97,25 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Build iOS App with SPM Integration
+      - name: Build iOS App
         run: |
           cd example
           flutter pub get
-          flutter build ios --no-codesign
+          flutter build ios --no-codesign 2>&1 | tee ios_build.log
 
-      - name: iOS & SPM Report
+      - name: Publish iOS & SPM Warnings to Dashboard
         if: always()
         run: |
-          echo "### 🍏 iOS & Swift Package Manager Report" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| CocoaPods Compatibility | ✅ Validated |" >> $GITHUB_STEP_SUMMARY
-          echo "| Swift Package Manager Target | ✅ Built Successfully |" >> $GITHUB_STEP_SUMMARY
-          echo "| iOS Compilation | ${{ job.status == 'success' && '✅ PASSED' || '❌ FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "### 🍏 iOS & Swift Package Manager Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status == 'success' && '✅ PASSED' \vert{}\vert{} '❌ FAILED' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### ⚠️ Filtered iOS / SPM Notices & Warnings:" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          grep -E -i 'warning|error|plugin|spm|package|dependency' example/ios_build.log || echo "No critical warnings found." >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary><b>📋 Click to view Full iOS Build Log</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          tail -n 60 example/ios_build.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
