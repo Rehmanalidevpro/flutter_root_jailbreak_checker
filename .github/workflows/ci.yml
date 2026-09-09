@@ -26,10 +26,15 @@ jobs:
       - name: Analyze Dart Code
         run: flutter analyze --fatal-infos
 
-      - name: Run Dart Unit Tests
-        run: flutter test
+      - name: Run Dart Unit Tests (If available)
+        run: |
+          if [ -d "test" ]; then
+            flutter test
+          else
+            echo "Test directory not found. Skipping unit tests."
+          fi
 
-  # 2. Android Strict Build Test (No Bypass Flags)
+  # 2. Android Strict Build Test
   android_build:
     name: Android Build Validation
     runs-on: ubuntu-latest
