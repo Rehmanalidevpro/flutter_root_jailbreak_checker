@@ -71,8 +71,13 @@ jobs:
       - name: Publish Android Warnings to Dashboard
         if: always()
         run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="✅ PASSED"
+          else
+            STATUS="❌ FAILED"
+          fi
           echo "### 🤖 Android Build & Warnings Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Status: ${{ job.status == 'success' && '✅ PASSED' \vert{}\vert{} '❌ FAILED' }}" >> $GITHUB_STEP_SUMMARY
+          echo "Status: $STATUS" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### ⚠️ Filtered Android / Gradle Warnings:" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
@@ -106,8 +111,13 @@ jobs:
       - name: Publish iOS & SPM Warnings to Dashboard
         if: always()
         run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="✅ PASSED"
+          else
+            STATUS="❌ FAILED"
+          fi
           echo "### 🍏 iOS & Swift Package Manager Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Status: ${{ job.status == 'success' && '✅ PASSED' \vert{}\vert{} '❌ FAILED' }}" >> $GITHUB_STEP_SUMMARY
+          echo "Status: $STATUS" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### ⚠️ Filtered iOS / SPM Notices & Warnings:" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
