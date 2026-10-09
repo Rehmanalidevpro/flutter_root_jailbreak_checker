@@ -41,7 +41,7 @@ Add to your project's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_root_jailbreak_checker: ^2.1.6
+  flutter_root_jailbreak_checker: ^2.1.8
 ```
 
 Then run:

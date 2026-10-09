@@ -1,3 +1,9 @@
+## 2.1.8
+
+* fix: Migrated the Android plugin to support Flutter's Built-in Kotlin architecture (Resolves #5).
+* chore: Removed explicit Kotlin Gradle Plugin (KGP) configurations from the plugin's build environment to prevent version conflicts on newer Flutter builds.
+* chore: Upgraded the example application to support AGP 9.0+ and modern declarative DSL for a stable testing environment.
+
 ## 2.1.7
 * [iOS] Added Swift Package Manager support. The iOS platform code now ships as a Swift package at `ios/flutter_root_jailbreak_checker/`.
 * [iOS] CocoaPods is still fully supported — the podspec now points at the new source location. Existing apps need no changes.
