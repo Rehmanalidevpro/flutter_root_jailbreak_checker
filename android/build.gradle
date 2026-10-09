@@ -19,10 +19,6 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
-
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
@@ -35,4 +31,14 @@ android {
 dependencies {
     implementation 'com.google.android.play:integrity:1.3.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'
+}
+
+project.tasks.configureEach { task ->
+    if (task.name.contains("compile") && task.name.contains("Kotlin")) {
+        try {
+            task.kotlinOptions.jvmTarget = "1.8"
+        } catch (Exception e) {
+    
+        }
+    }
 }

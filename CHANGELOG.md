@@ -1,3 +1,8 @@
+## 2.1.9
+
+* fix: Resolved JVM-target compatibility mismatch between Java and Kotlin compiler tasks.
+* fix: Removed deprecated `kotlinOptions` block from the Android library extension that caused project evaluation errors in specific Gradle environments (Resolves #5 compatibility issue).
+
 ## 2.1.8
 
 * fix: Migrated the Android plugin to support Flutter's Built-in Kotlin architecture (Resolves #5).
